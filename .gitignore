@@ -1,0 +1,49 @@
+# Python bytecode and tooling
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Virtual environments and local secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local dataset and experiment configuration
+data/
+configs/local/
+
+# Model weights, embeddings, and experiment outputs
+pretrained/
+work_dirs/
+runs/
+outputs/
+predictions/
+*.pth
+*.pt
+*.ckpt
+*.npy
+*.npz
+!tests/fixtures/*.npy
+!tests/fixtures/*.npz
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*~

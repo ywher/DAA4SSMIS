@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the ECCV 2026 paper."
+title: "DAA4SSMIS"
+type: software
+authors:
+  - family-names: Yan
+    given-names: Weihao
+  - family-names: Qian
+    given-names: Yeqiang
+  - family-names: Dong
+    given-names: Yi
+  - family-names: Yang
+    given-names: Ming
+date-released: 2026-08-08
+license: MIT
+repository-code: "https://github.com/ywher/DAA4SSMIS"
+preferred-citation:
+  type: conference-paper
+  title: "Beyond Random Sampling: Distribution-Aware Alignment for Semi-Supervised Medical Image Segmentation"
+  authors:
+    - family-names: Yan
+      given-names: Weihao
+    - family-names: Qian
+      given-names: Yeqiang
+    - family-names: Dong
+      given-names: Yi
+    - family-names: Yang
+      given-names: Ming
+  conference:
+    name: "European Conference on Computer Vision"
+  year: 2026

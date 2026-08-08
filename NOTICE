@@ -1,0 +1,20 @@
+DAA4SSMIS initial public release
+================================
+
+This repository includes adapted components from UniMatch V2:
+https://github.com/LiheYoung/UniMatch-V2
+Copyright (c) 2024 Lihe Yang, distributed under the MIT License.
+
+The files under model/backbone/dinov2* are adapted from Meta AI's DINOv2:
+https://github.com/facebookresearch/dinov2
+Copyright (c) Meta Platforms, Inc. and affiliates. These files are distributed
+under the Apache License 2.0; see third_party_licenses/DINOV2.txt. The attention
+implementation was modified to add a CPU fallback.
+
+BCP is implemented from the method described in:
+Bidirectional Copy-Paste for Semi-Supervised Medical Image Segmentation,
+CVPR 2023.
+
+Release scope (August 2026): the 2D Stage 1 example, BUSI/ISIC configurations,
+and the UniMatch V2 + BCP baseline are public. The 3D dataset pipeline and the
+paper's MCP / Stage 2 source code are intentionally not part of this release.

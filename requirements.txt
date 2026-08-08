@@ -1,0 +1,11 @@
+torch>=2.1
+torchvision>=0.16
+numpy>=1.23
+Pillow>=9.0
+PyYAML>=6.0
+scikit-learn>=1.2
+scipy>=1.9
+MedPy>=0.5
+matplotlib>=3.6
+tensorboard>=2.12
+tqdm>=4.64

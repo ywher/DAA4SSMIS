@@ -1,0 +1,25 @@
+# arguments for dataset
+dataset: isic
+data_root: data/isic
+nclass: 2
+# DINOv2 uses a patch size of 14, so 518 gives a 37x37 token grid.
+crop_size: 518
+pre_resize: [518, 518]  # [height, width] - resize images to uniform size before augmentation
+
+# arguments for training
+epochs: 180
+batch_size: 4 # per GPU x 2 GPUs
+lr: 0.000005
+lr_multi: 40.0
+eval_interval: 10  # evaluate every N epochs
+criterion:
+  name: OHEM
+  kwargs:
+    ignore_index: 255
+    thresh: 0.7
+    min_kept: 200000
+conf_thresh: 0.95
+# arguments for model
+model: dpt
+backbone: dinov2_small
+lock_backbone: False
