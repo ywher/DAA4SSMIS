@@ -5,6 +5,7 @@ Official PyTorch implementation of **Beyond Random Sampling: Distribution-Aware 
 Weihao Yan, Yeqiang Qian, Yi Dong, and Ming Yang
 
 [[Paper](https://arxiv.org/abs/2607.04249)]
+[[Video](https://www.youtube.com/watch?v=AaDR-il_4jw&t=56s)]
 
 ![Framework overview](docs/framework.png)
 
@@ -85,10 +86,10 @@ image/train/example.png label/train/example.png
 
 Included annotation ratios are:
 
-| Dataset | Classes | Ratios |
-|---|---:|---|
-| BUSI | 2 | 1/16, 1/8, 1/4 |
-| ISIC | 2 | 1/80, 1/40, 1/20 |
+| Dataset | Classes | Ratios           |
+| ------- | ------: | ---------------- |
+| BUSI    |       2 | 1/16, 1/8, 1/4   |
+| ISIC    |       2 | 1/80, 1/40, 1/20 |
 
 Frozen experiment splits live under
 `splits/<dataset>/dkc/<ratio>/{labeled,unlabeled}.txt`.
@@ -98,16 +99,16 @@ Frozen experiment splits live under
 Tracked defaults are provided in `configs/busi.yaml` and `configs/isic.yaml`.
 The most commonly changed fields are:
 
-| Field | Meaning | Default |
-|---|---|---|
-| `data_root` | dataset directory | `data/<dataset>` |
-| `crop_size` | model input size | `518` |
-| `epochs` | training epochs | `180` |
-| `batch_size` | batch size per GPU | `4` |
-| `lr` | DINOv2 encoder learning rate | `5e-6` |
-| `lr_multi` | decoder learning-rate multiplier | `40` |
-| `conf_thresh` | pseudo-label confidence threshold | `0.95` |
-| `eval_interval` | validation frequency in epochs | `10` |
+| Field             | Meaning                           | Default            |
+| ----------------- | --------------------------------- | ------------------ |
+| `data_root`     | dataset directory                 | `data/<dataset>` |
+| `crop_size`     | model input size                  | `518`            |
+| `epochs`        | training epochs                   | `180`            |
+| `batch_size`    | batch size per GPU                | `4`              |
+| `lr`            | DINOv2 encoder learning rate      | `5e-6`           |
+| `lr_multi`      | decoder learning-rate multiplier  | `40`             |
+| `conf_thresh`   | pseudo-label confidence threshold | `0.95`           |
+| `eval_interval` | validation frequency in epochs    | `10`             |
 
 To keep machine-specific paths out of Git, copy a configuration into the
 ignored `configs/local/` directory:
@@ -120,13 +121,13 @@ cp configs/busi.yaml configs/local/busi.yaml
 
 The wrapper scripts accept these environment overrides:
 
-| Variable | Used by | Purpose |
-|---|---|---|
-| `CONFIG_PATH` | train/evaluate | custom YAML configuration |
-| `DATA_ROOT` | Stage 1 | dataset directory |
-| `DINOV2_WEIGHTS` | Stage 1/train | encoder checkpoint |
-| `LABELED_ID_PATH` | train | custom labeled split |
-| `UNLABELED_ID_PATH` | train | custom unlabeled split |
+| Variable              | Used by        | Purpose                   |
+| --------------------- | -------------- | ------------------------- |
+| `CONFIG_PATH`       | train/evaluate | custom YAML configuration |
+| `DATA_ROOT`         | Stage 1        | dataset directory         |
+| `DINOV2_WEIGHTS`    | Stage 1/train  | encoder checkpoint        |
+| `LABELED_ID_PATH`   | train          | custom labeled split      |
+| `UNLABELED_ID_PATH` | train          | custom unlabeled split    |
 
 Example:
 
