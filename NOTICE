@@ -15,6 +15,7 @@ BCP is implemented from the method described in:
 Bidirectional Copy-Paste for Semi-Supervised Medical Image Segmentation,
 CVPR 2023.
 
-Release scope (August 2026): the 2D Stage 1 example, BUSI/ISIC configurations,
-and the UniMatch V2 + BCP baseline are public. The 3D dataset pipeline and the
-paper's MCP / Stage 2 source code are intentionally not part of this release.
+Release scope: Stage 1, BUSI/ISIC 2D examples, the PROMISE12 3D case-selection
+example, and the UniMatch V2 + BCP baseline are public. The paper's MCP / Stage 2
+source code is not part of this release. The raw-volume converter is an explicit
+reference preprocessing recipe, not a claim of exact historical preprocessing.

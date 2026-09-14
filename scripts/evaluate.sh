@@ -11,8 +11,8 @@ dataset=$2
 exp_path=$3
 model_name=$4
 split=$5
-if [[ "${dataset}" != "busi" && "${dataset}" != "isic" ]]; then
-  echo "Initial release supports only busi and isic" >&2
+if [[ "${dataset}" != "busi" && "${dataset}" != "isic" && "${dataset}" != "promise12" ]]; then
+  echo "Supported datasets: busi, isic, promise12" >&2
   exit 2
 fi
 if [[ "${split}" != "val" && "${split}" != "test" ]]; then

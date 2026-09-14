@@ -39,6 +39,13 @@ predictions/
 *.ckpt
 *.npy
 *.npz
+# Raw medical volumes (download separately under the dataset's terms)
+*.mhd
+*.mha
+*.raw
+*.zraw
+*.nii
+*.nii.gz
 !tests/fixtures/*.npy
 !tests/fixtures/*.npz
 

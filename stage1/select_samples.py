@@ -8,6 +8,12 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
 from stage1.extract_features import parse_image_path, read_split
+from stage1.case_sequences import (
+    centered_sequences,
+    sequence_distances,
+    sequence_density_kcenter,
+)
+from util.cases import case_id, validate_partition
 
 
 def l2_normalize(features):
@@ -63,7 +69,15 @@ def parse_ratio(value):
     return float(value)
 
 
-def select_split(feature_dir, all_id_path, ratio, output_dir, knn=20):
+def select_split(
+    feature_dir,
+    all_id_path,
+    ratio,
+    output_dir,
+    knn=20,
+    case_sequence=False,
+    sequence_length=None,
+):
     feature_dir, output_dir = Path(feature_dir), Path(output_dir)
     lines = read_split(all_id_path)
     fraction = parse_ratio(ratio)
@@ -76,20 +90,52 @@ def select_split(feature_dir, all_id_path, ratio, output_dir, knn=20):
     )
     if len(features) != len(sample_ids):
         raise ValueError("Feature and sample ID counts differ")
+    if len(sample_ids) != len(set(sample_ids)):
+        raise ValueError("Duplicate feature sample IDs")
     by_image = {parse_image_path(line): line for line in lines}
     if len(by_image) != len(lines):
         raise ValueError("The all-sample split contains duplicate image paths")
     if set(sample_ids) != set(by_image):
         raise ValueError("Feature sample IDs do not match the all-sample split")
-    budget = max(1, int(round(len(sample_ids) * fraction)))
-    selected_indices = density_kcenter(features, budget, knn)
-    selected_ids = {sample_ids[index] for index in selected_indices}
+    case_metadata = {}
+    if case_sequence:
+        sequences, cases, mapping = centered_sequences(
+            features, sample_ids, sequence_length
+        )
+        budget = max(1, int(len(cases) * fraction))
+        selected_indices = sequence_density_kcenter(
+            sequence_distances(sequences), budget, knn
+        )
+        selected_cases = {cases[i] for i in selected_indices}
+        selected_ids = {
+            identifier
+            for identifier in sample_ids
+            if case_id(identifier) in selected_cases
+        }
+        case_metadata = {
+            "sampling_unit": "case",
+            "num_cases": len(cases),
+            "num_labeled_cases": budget,
+            "selected_cases": sorted(selected_cases),
+            "sequence_length": sequences.shape[1],
+            "sequence_strategy": "middle_with_cyclic_padding",
+            "distance": "aligned_mean_cosine",
+            "initialization": "largest_mean_distance_to_pool",
+            "budget_rounding": "floor",
+            "case_mapping": mapping,
+        }
+    else:
+        budget = max(1, int(round(len(sample_ids) * fraction)))
+        selected_indices = density_kcenter(features, budget, knn)
+        selected_ids = {sample_ids[index] for index in selected_indices}
     labeled = [
         by_image[sample_id] for sample_id in sample_ids if sample_id in selected_ids
     ]
     unlabeled = [
         by_image[sample_id] for sample_id in sample_ids if sample_id not in selected_ids
     ]
+    if case_sequence:
+        validate_partition(lines, labeled, unlabeled)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "labeled.txt").write_text("\n".join(labeled) + "\n", encoding="utf-8")
@@ -102,6 +148,7 @@ def select_split(feature_dir, all_id_path, ratio, output_dir, knn=20):
         "knn": knn,
         "num_labeled": len(labeled),
         "num_unlabeled": len(unlabeled),
+        **case_metadata,
     }
     (output_dir / "selection.json").write_text(
         json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
@@ -116,6 +163,15 @@ def parse_args():
     parser.add_argument("--ratio", required=True, help="Examples: 1_16, 1_8, 0.25")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--knn", type=int, default=20)
+    parser.add_argument(
+        "--case-sequence", action="store_true", help="Select complete 3D cases"
+    )
+    parser.add_argument(
+        "--sequence-length",
+        type=int,
+        default=None,
+        help="Default: median training-case depth",
+    )
     return parser.parse_args()
 
 
@@ -127,6 +183,8 @@ def main():
         args.ratio,
         args.output_dir,
         knn=args.knn,
+        case_sequence=args.case_sequence,
+        sequence_length=args.sequence_length,
     )
     print(json.dumps(metadata, indent=2))
 

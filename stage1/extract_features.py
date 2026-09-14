@@ -1,4 +1,4 @@
-"""Extract hierarchical DINOv2 embeddings for the 2D Stage 1 example."""
+"""Extract hierarchical DINOv2 descriptors for images or volume slices."""
 
 import argparse
 import json

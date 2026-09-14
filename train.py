@@ -13,6 +13,7 @@ import torch
 from torch import nn
 import torch.backends.cudnn as cudnn
 import torch.distributed as dist
+import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 import yaml
@@ -23,6 +24,9 @@ except ImportError:  # TensorBoard logging is optional at runtime.
     SummaryWriter = None
 
 from dataset.semi import SemiDataset
+from util.cases import assemble_volumes, validate_partition
+from util.case_sampler import CaseSampler
+from util.eval_utils import calculate_dice_jc_per_sample, aggregate_metrics_across_gpus
 from util.bcp import BCPModule, bcp_pretrain, init_ema_from_student
 from util.dist_helper import setup_distributed
 from util.model import build_model
@@ -87,9 +91,30 @@ def create_criterion(cfg, local_rank):
 
 
 @torch.inference_mode()
-def validate(model, loader, nclass, local_rank):
-    """Distributed global Dice used only for selecting the best checkpoint."""
+def validate(model, loader, nclass, local_rank, cfg=None):
+    """Checkpoint metric: global Dice for 2D; mean case Dice for 3D."""
     model.eval()
+    if cfg and cfg.get("case_level", False):
+        records = []
+        for images, masks, identifiers in loader:
+            predictions = model(images.cuda(local_rank, non_blocking=True)).argmax(1)
+            size = cfg.get("eval_resize")
+            if size is not None:
+                predictions = F.interpolate(
+                    predictions[:, None].float(), size=size, mode="nearest"
+                )[:, 0]
+                masks = F.interpolate(
+                    masks[:, None].float(), size=size, mode="nearest"
+                )[:, 0]
+            records.extend(zip(identifiers, predictions.cpu().numpy(), masks.numpy()))
+        values = [[] for _ in range(nclass)]
+        for _, prediction, target in assemble_volumes(records):
+            for class_id in range(nclass):
+                values[class_id].append(
+                    calculate_dice_jc_per_sample(prediction, target, class_id)[0]
+                )
+        dice = aggregate_metrics_across_gpus(values)
+        return float(dice[1:].mean()), dice
     device = torch.device("cuda", local_rank)
     intersection = torch.zeros(nclass, dtype=torch.float64, device=device)
     prediction = torch.zeros_like(intersection)
@@ -125,6 +150,16 @@ def main():
     args = parse_args()
     with open(args.config, encoding="utf-8") as handle:
         cfg = yaml.safe_load(handle)
+    if cfg.get("case_level", False):
+
+        def read_ids(path):
+            return Path(path).read_text(encoding="utf-8").splitlines()
+
+        validate_partition(
+            read_ids(f"splits/{cfg['dataset']}/train.txt"),
+            read_ids(args.labeled_id_path),
+            read_ids(args.unlabeled_id_path),
+        )
     seed_everything(args.seed)
     rank, world_size = setup_distributed(port=args.port)
     local_rank = int(os.environ["LOCAL_RANK"])
@@ -194,7 +229,11 @@ def main():
 
     sampler_l = torch.utils.data.distributed.DistributedSampler(train_l, shuffle=True)
     sampler_u = torch.utils.data.distributed.DistributedSampler(train_u, shuffle=True)
-    sampler_v = torch.utils.data.distributed.DistributedSampler(val, shuffle=False)
+    sampler_v = (
+        CaseSampler(val)
+        if cfg.get("case_level", False)
+        else torch.utils.data.distributed.DistributedSampler(val, shuffle=False)
+    )
     loader_l = DataLoader(
         train_l,
         cfg["batch_size"],
@@ -351,9 +390,9 @@ def main():
             "eval_interval", 10
         ) == 0 or epoch + 1 == cfg["epochs"]
         if should_evaluate:
-            student_dice, _ = validate(model, loader_v, cfg["nclass"], local_rank)
+            student_dice, _ = validate(model, loader_v, cfg["nclass"], local_rank, cfg)
             ema_dice, class_dice = validate(
-                teacher, loader_v, cfg["nclass"], local_rank
+                teacher, loader_v, cfg["nclass"], local_rank, cfg
             )
             if rank == 0:
                 logger.info(

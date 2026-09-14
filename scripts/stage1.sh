@@ -2,14 +2,14 @@
 set -euo pipefail
 
 if [[ $# -lt 2 ]]; then
-  echo "Usage: $0 <busi|isic> <ratio>" >&2
+  echo "Usage: $0 <busi|isic|promise12> <ratio>" >&2
   exit 2
 fi
 
 dataset=$1
 ratio=$2
-if [[ "${dataset}" != "busi" && "${dataset}" != "isic" ]]; then
-  echo "Initial release supports only busi and isic" >&2
+if [[ "${dataset}" != "busi" && "${dataset}" != "isic" && "${dataset}" != "promise12" ]]; then
+  echo "Supported datasets: busi, isic, promise12" >&2
   exit 2
 fi
 root_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -19,6 +19,10 @@ data_root=${DATA_ROOT:-data/${dataset}}
 weights=${DINOV2_WEIGHTS:-pretrained/dinov2_small.pth}
 
 cd "${root_dir}"
+case_args=()
+if [[ "${dataset}" == "promise12" ]]; then
+  case_args+=(--case-sequence)
+fi
 python -m stage1.extract_features \
   --data-root "${data_root}" \
   --id-path "splits/${dataset}/train.txt" \
@@ -29,4 +33,4 @@ python -m stage1.select_samples \
   --feature-dir "${feature_dir}" \
   --all-id-path "splits/${dataset}/train.txt" \
   --ratio "${ratio}" \
-  --output-dir "${output_dir}"
+  --output-dir "${output_dir}" "${case_args[@]}"

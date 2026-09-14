@@ -1,6 +1,7 @@
-"""Distributed evaluation entry point for the BUSI and ISIC examples."""
+"""Slice-wise inference with 2D image or 3D complete-case metrics."""
 
 import argparse
+import csv
 import logging
 import os
 from pathlib import Path
@@ -29,11 +30,13 @@ from util.eval_utils import (
     compute_metric_means,
 )
 from util.model import build_model
+from util.cases import assemble_volumes, case_id
+from util.case_sampler import CaseSampler
 from util.utils import count_params, init_log
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Evaluate a 2D segmentation model")
+    parser = argparse.ArgumentParser(description="Evaluate 2D images or 3D cases")
     parser.add_argument("--config", required=True)
     parser.add_argument("--exp-path", required=True)
     parser.add_argument("--model-name", required=True, choices=["best", "latest"])
@@ -123,8 +126,12 @@ def evaluate(model, loader, cfg, local_rank, args, output_root):
     }
     colors = get_color_map(cfg["dataset"])
     save_outputs = args.save_pred or args.save_compare
+    case_level = cfg.get("case_level", False)
+    records = []
     directories = prepare_output_dirs(
-        output_root, save_outputs and dist.get_rank() == 0, args.save_compare
+        output_root,
+        save_outputs and (case_level or dist.get_rank() == 0),
+        args.save_compare,
     )
 
     for images, masks, sample_ids in tqdm(loader, desc="Evaluating"):
@@ -143,6 +150,15 @@ def evaluate(model, loader, cfg, local_rank, args, output_root):
         pred_numpy = metric_predictions.cpu().numpy()
         mask_numpy = metric_masks.numpy()
         for batch_index in range(len(pred_numpy)):
+            if case_level:
+                records.append(
+                    (
+                        sample_ids[batch_index],
+                        pred_numpy[batch_index],
+                        mask_numpy[batch_index],
+                    )
+                )
+                continue
             for class_id in range(nclass):
                 dice, jc = calculate_dice_jc_per_sample(
                     pred_numpy[batch_index], mask_numpy[batch_index], class_id
@@ -160,6 +176,12 @@ def evaluate(model, loader, cfg, local_rank, args, output_root):
             original_masks = masks.numpy().astype(np.uint8)
             for index, identifier in enumerate(sample_ids):
                 name = sample_name(identifier)
+                if case_level:
+                    name = f"{case_id(identifier)}/{name}"
+                    for directory in directories.values():
+                        (directory / case_id(identifier)).mkdir(
+                            parents=True, exist_ok=True
+                        )
                 prediction = original_predictions[index]
                 Image.fromarray(prediction).save(directories["ids"] / f"{name}.png")
                 Image.fromarray(colors[prediction]).save(
@@ -173,6 +195,39 @@ def evaluate(model, loader, cfg, local_rank, args, output_root):
                         colors,
                         directories["comparisons"] / f"{name}.png",
                     )
+
+    if case_level:
+        case_rows = []
+        for identifier, prediction, target in assemble_volumes(records):
+            row = {"case": identifier, "slices": len(prediction)}
+            for class_id in range(nclass):
+                dice, jc = calculate_dice_jc_per_sample(prediction, target, class_id)
+                asd, hd95 = calculate_distance_metrics_medpy(
+                    prediction, target, class_id
+                )
+                for name, value in (
+                    ("dice", dice),
+                    ("jc", jc),
+                    ("asd", asd),
+                    ("hd95", hd95),
+                ):
+                    metric_lists[name][class_id].append(value)
+                    row[f"{name}_class{class_id}"] = value
+            case_rows.append(row)
+        gathered = [None] * dist.get_world_size()
+        dist.all_gather_object(gathered, case_rows)
+        if dist.get_rank() == 0:
+            rows = sorted(
+                [row for part in gathered for row in part], key=lambda row: row["case"]
+            )
+            if rows:
+                output_root.mkdir(parents=True, exist_ok=True)
+                with (output_root / "case_metrics.csv").open(
+                    "w", newline="", encoding="utf-8"
+                ) as handle:
+                    writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+                    writer.writeheader()
+                    writer.writerows(rows)
 
     return {
         name: aggregate_metrics_across_gpus(values)
@@ -211,7 +266,9 @@ def main():
     with open(args.config, encoding="utf-8") as handle:
         cfg = yaml.safe_load(handle)
     if cfg["dataset"] not in CLASSES:
-        raise ValueError("Initial release supports only busi and isic")
+        raise ValueError("Supported datasets: busi, isic, promise12")
+    if args.eval_resize is None:
+        args.eval_resize = cfg.get("eval_resize")
     if args.backbone is not None:
         cfg["backbone"] = args.backbone
 
@@ -249,9 +306,18 @@ def main():
     dataset = SemiDataset(
         cfg["dataset"], cfg["data_root"], split, pre_resize=cfg.get("pre_resize")
     )
-    sampler = torch.utils.data.distributed.DistributedSampler(dataset, shuffle=False)
+    sampler = (
+        CaseSampler(dataset)
+        if cfg.get("case_level", False)
+        else torch.utils.data.distributed.DistributedSampler(dataset, shuffle=False)
+    )
     loader = DataLoader(dataset, batch_size=1, sampler=sampler, num_workers=1)
-    output_root = Path(args.exp_path) / f"pred_{split}"
+    output_name = (
+        f"pred_{split}_{args.model_name}_{args.weights}"
+        if cfg.get("case_level", False)
+        else f"pred_{split}"
+    )
+    output_root = Path(args.exp_path) / output_name
     metrics = evaluate(model, loader, cfg, local_rank, args, output_root)
 
     if rank == 0:

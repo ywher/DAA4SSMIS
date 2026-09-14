@@ -1,0 +1,23 @@
+# Slice-wise 2D training with complete-case selection and volume evaluation.
+dataset: promise12
+data_root: data/promise12
+nclass: 2
+case_level: true
+crop_size: 518
+pre_resize: [518, 518]
+eval_resize: [224, 224]
+epochs: 180
+batch_size: 4
+lr: 0.000005
+lr_multi: 40.0
+eval_interval: 10
+criterion:
+  name: OHEM
+  kwargs:
+    ignore_index: 255
+    thresh: 0.7
+    min_kept: 200000
+conf_thresh: 0.95
+model: dpt
+backbone: dinov2_small
+lock_backbone: false

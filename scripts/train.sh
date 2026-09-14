@@ -10,8 +10,8 @@ num_gpus=$1
 port=$2
 dataset=$3
 ratio=$4
-if [[ "${dataset}" != "busi" && "${dataset}" != "isic" ]]; then
-  echo "Initial release supports only busi and isic" >&2
+if [[ "${dataset}" != "busi" && "${dataset}" != "isic" && "${dataset}" != "promise12" ]]; then
+  echo "Supported datasets: busi, isic, promise12" >&2
   exit 2
 fi
 save_path=${5:-work_dirs/${dataset}/${ratio}/unimatchv2_bcp}

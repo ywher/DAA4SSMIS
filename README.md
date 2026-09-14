@@ -11,23 +11,26 @@ Weihao Yan, Yeqiang Qian, Yi Dong, and Ming Yang
 
 ## Release status
 
-This initial release focuses on a compact, reproducible 2D example:
+This release provides compact 2D examples and one 3D dataset example:
 
 - **Stage 1:** hierarchical DINOv2 encoding and Density-K-Center (DKC) selection.
 - **Training:** DINOv2-S + DPT with UniMatch V2 + BCP enabled by default.
-- **Evaluation:** IoU/JC, Dice, ASD, and HD95 metrics.
-- **Example datasets:** BUSI and ISIC, including the DKC splits used in the paper.
+- **Evaluation:** IoU/JC, Dice, ASD, and HD95; complete-volume metrics for PROMISE12.
+- **2D examples:** BUSI and ISIC, including frozen DKC splits.
+- **3D example:** PROMISE12: volume preparation, case-sequence DKC selection,
+  slice-wise training, and volume-level evaluation. See the
+  [PROMISE12 guide and presentation notes](docs/promise12_3d.md).
 
-The 3D dataset pipeline and the paper's Stage 2 / MCP implementation are still
-being consolidated and are not included in this version. The framework figure
+The paper's Stage 2 / MCP implementation is still being consolidated and is
+not included in this version. The framework figure
 shows the complete method for context.
 
 ## Repository layout
 
 ```text
-configs/             BUSI and ISIC experiment configurations
+configs/             BUSI, ISIC, and PROMISE12 configurations
 dataset/             labeled/unlabeled dataset and augmentations
-docs/                paper figures used by this README
+docs/                paper figures and 3D processing guide
 model/               DINOv2 backbone and DPT segmentation head
 scripts/             Stage 1, training, and evaluation wrappers
 splits/              dataset partitions and frozen DKC splits
@@ -90,13 +93,19 @@ Included annotation ratios are:
 | ------- | ------: | ---------------- |
 | BUSI    |       2 | 1/16, 1/8, 1/4   |
 | ISIC    |       2 | 1/80, 1/40, 1/20 |
+| PROMISE12 |     2 | 1/16 (2 of 35 training cases) |
 
 Frozen experiment splits live under
 `splits/<dataset>/dkc/<ratio>/{labeled,unlabeled}.txt`.
 
+PROMISE12 uses complete-case selection. Its 35/5/10 train/validation/test case
+partition and the 1/16 example are included. For raw `.mhd` conversion and the
+expected PNG layout, follow [the 3D guide](docs/promise12_3d.md).
+
 ## 3. Configure an experiment
 
-Tracked defaults are provided in `configs/busi.yaml` and `configs/isic.yaml`.
+Tracked defaults are provided in `configs/busi.yaml`, `configs/isic.yaml`, and
+`configs/promise12.yaml`.
 The most commonly changed fields are:
 
 | Field             | Meaning                           | Default            |
@@ -144,6 +153,7 @@ runs DKC with `k=20`:
 
 ```bash
 bash scripts/stage1.sh busi 1_16
+bash scripts/stage1.sh promise12 1_16
 
 DATA_ROOT=/datasets/isic \
 DINOV2_WEIGHTS=/checkpoints/dinov2_vits14_pretrain.pth \
@@ -153,6 +163,9 @@ bash scripts/stage1.sh isic 1_80
 Generated splits are written to
 `work_dirs/stage1/<dataset>/splits/<ratio>/`. The extractor and selector can
 also be invoked separately; run either module with `--help` for all options.
+For PROMISE12, the wrapper automatically enables `--case-sequence`: naturally
+ordered slices are centered to a common depth, compared with aligned-slice
+cosine distance, and selected as whole cases. Selection never reads masks.
 
 ## 5. Train
 
@@ -161,11 +174,15 @@ BCP is enabled by default:
 ```bash
 bash scripts/train.sh 2 29500 busi 1_16
 bash scripts/train.sh 2 29500 isic 1_80
+bash scripts/train.sh 2 29500 promise12 1_16
 ```
 
 Outputs default to `work_dirs/<dataset>/<ratio>/unimatchv2_bcp`. Training saves
 `latest.pth` after every epoch and selects `best.pth` using EMA validation Dice.
 Resume is automatic when `latest.pth` exists in the output directory.
+For PROMISE12, checkpoint selection uses mean foreground case Dice at the
+configured evaluation size. All slices of each case are assigned to the same
+evaluation process, without duplicated padding cases.
 
 To use a newly generated Stage 1 split:
 
@@ -185,6 +202,9 @@ Evaluation uses the EMA teacher by default:
 ```bash
 bash scripts/evaluate.sh 29501 busi \
   work_dirs/busi/1_16/unimatchv2_bcp best val
+
+bash scripts/evaluate.sh 29501 promise12 \
+  work_dirs/promise12/1_16/unimatchv2_bcp best test
 
 CONFIG_PATH=configs/local/isic.yaml \
 bash scripts/evaluate.sh 29501 isic \
