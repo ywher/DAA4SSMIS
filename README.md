@@ -230,7 +230,9 @@ The training baseline builds on
   title     = {Beyond Random Sampling: Distribution-Aware Alignment for Semi-Supervised Medical Image Segmentation},
   author    = {Yan, Weihao and Qian, Yeqiang and Dong, Yi and Yang, Ming},
   booktitle = {European Conference on Computer Vision},
-  year      = {2026}
+  pages     = {369--388},
+  year      = {2026},
+  publisher = {Springer}
 }
 ```
 

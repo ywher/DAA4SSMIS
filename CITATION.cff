@@ -29,3 +29,7 @@ preferred-citation:
   conference:
     name: "European Conference on Computer Vision"
   year: 2026
+  start: 369
+  end: 388
+  publisher:
+    name: "Springer"
